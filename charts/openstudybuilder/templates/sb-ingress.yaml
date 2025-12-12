@@ -1,0 +1,51 @@
+{{- if .Values.sb.ingress.enabled -}}
+{{- $fullName := .Values.sb.fullnameOverride -}}
+{{- $svcPort := .Values.sb.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- if .Values.sb.ingress.router }}
+    router: {{ .Values.sb.ingress.router }}
+    {{- end }}
+    {{- include "chart.labels" . | nindent 4 }}
+  {{- with .Values.sb.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.sb.ingress.className }}
+  ingressClassName: {{ .Values.sb.ingress.className }}
+  {{- end }}
+  {{- if .Values.sb.ingress.tls }}
+  tls:
+    {{- range .Values.sb.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName  }}
+    {{- end }}
+  {{- else }}
+  tls:
+  - {}
+  {{- end }}
+  rules:
+    {{- range .Values.sb.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          {{- end }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,21 @@
+{{- if .Values.neo4j.demo }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.neo4j.neo4j.name }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.neo4j.neo4j.name }}
+spec:
+  type: {{ .Values.neo4j.services.neo4j.spec.type }}
+  selector:
+    {{- include "chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.neo4j.neo4j.name }}
+  ports:
+    - name: http
+      port: 7474
+      targetPort: http
+    - name: bolt
+      port: 7687
+      targetPort: bolt
+{{- end }}

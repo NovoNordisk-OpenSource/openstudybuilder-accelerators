@@ -1,0 +1,37 @@
+1. Access the StudyBuilder (frontend):
+{{- if .Values.sb.ingress.enabled }}
+  Ingress is enabled. Open:
+{{- range $host := .Values.sb.ingress.hosts }}
+  {{- range .paths }}
+  - http{{ if $.Values.sb.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+  Alternatively (useful for local dev), you can port-forward:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ .Values.sb.fullnameOverride }} 5005:{{ .Values.sb.service.port }}
+{{- else if contains "NodePort" .Values.sb.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ .Values.sb.fullnameOverride }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.sb.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ .Values.sb.fullnameOverride }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ .Values.sb.fullnameOverride }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.sb.service.port }}
+{{- else if contains "ClusterIP" .Values.sb.service.type }}
+  echo "Visit http://127.0.0.1:5005 to use StudyBuilder (frontend)"
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ .Values.sb.fullnameOverride }} 5005:{{ .Values.sb.service.port }}
+{{- end }}
+
+2. Optional port-forwards for other components:
+  # API (backend)
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/api 8080:8080
+
+  # Documentation
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/docs 5006:5006
+
+  # Neodash
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/neodash 5007:5007
+
+  # Neo4j Browser (if demo mode or subchart enabled)
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/mdrdb 7474:7474
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/mdrdb 7687:7687

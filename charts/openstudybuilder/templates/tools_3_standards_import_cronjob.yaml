@@ -1,0 +1,90 @@
+# This job must be executed first time
+# This job can be executed any subsquent times (e.g.: when new CDISC standards are available)
+# NOTE: we could consider implementing helm hooks https://helm.sh/docs/topics/charts_hooks/
+{{ if .Values.mdrdb.stdImports.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "chart.fullname" . }}-import-standards
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.mdrdb.cronjob.schedule.standardsImport | quote }}
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  # https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#schedule-suspension
+  suspend: true
+  jobTemplate:
+    spec:
+      parallelism: 1
+      completions: 1
+      activeDeadlineSeconds: 36000
+      backoffLimit: 5
+      template:
+        metadata:
+          name: '{{ include "chart.fullname" . }}-import-standards'
+        spec:
+          securityContext: {{ toYaml .Values.mdrdb.stdImports.securityContext | nindent 12 }}
+          # https://docs.openshift.com/container-platform/4.14/nodes/jobs/nodes-nodes-jobs.html#jobs-limits_nodes-nodes-jobs
+          restartPolicy: OnFailure
+          containers:
+          - name: mdr-standards-import
+            image: {{ .Values.mdrdb.stdImports.image.customImage }}
+            command:
+              - /bin/bash
+              - -c
+              - |
+                sleep 20
+                echo "Creating, if not exist, CDISC CT and Data Models directories..."
+                mkdir -p {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/cdisc_ct
+                mkdir -p {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/cdisc_data_models
+                sleep 20
+                echo "Importing CDISC CT JSON data from CDISC API..."
+                pipenv run download_ct_json_data_from_cdisc_api '{{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/cdisc_ct'
+                sleep 10
+                echo "Downloading data models JSON data from CDISC API..."
+                pipenv run download_data_models_json_data_from_cdisc_api '{{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/cdisc_data_models'
+                sleep 10
+                echo "Start bulk import of CDISC CT JSON data into Neo4j..."
+                ls -lah {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/**
+                pipenv run import_cdisc_ct_into_cdisc_db
+                pipenv run import_ct_from_cdisc_db_into_mdr
+                pipenv run bulk_import_data_models 'CDI4A-Jenkins' '{{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}'
+                sleep 10
+            volumeMounts:
+              - name: "{{ .Values.mdrdb.stdImports.pvc.name }}-volume"
+                mountPath: {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}
+            env:
+            {{- range $key, $value := .Values.mdrdb.stdImports.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: NEO4J_MDR_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: password
+            - name: NEO4J_CDISC_IMPORT_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: password
+            - name: CDISC_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdisc-secret
+                  key: auth-token
+            resources:
+              limits:
+                memory: "4096Mi"
+                cpu: "1000m"
+              requests:
+                memory: "4096Mi"
+                cpu: "1000m"
+            securityContext: {{ .Values.mdrdb.stdImports.containerSecurityContext | toYaml  | nindent 14 }}
+          volumes:
+          - name: "{{ .Values.mdrdb.stdImports.pvc.name }}-volume"
+            persistentVolumeClaim:
+              claimName: {{ .Values.mdrdb.stdImports.pvc.name }}
+{{- end }}

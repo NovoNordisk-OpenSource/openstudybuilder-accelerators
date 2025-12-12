@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.consumerApi.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "consumer-api"
+spec:
+  {{- if not .Values.consumerApi.autoscaling.enabled }}
+  replicas: {{ .Values.consumerApi.replicaCount }}
+  {{- end }}
+  strategy:
+    {{- toYaml .Values.consumerApi.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "consumer-api"
+  template:
+    metadata:
+      {{- with .Values.consumerApi.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "consumer-api"
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- with .Values.consumerApi.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext: {{ toYaml .Values.consumerApi.securityContext | nindent 8 }}
+      initContainers:
+      - name: wait-for-api
+        image: public.ecr.aws/eks-anywhere/cli-tools:v0.24.1-eks-a-110
+        command:
+          - kubectl
+          - wait
+          - --for=condition=ready
+          - pod
+          - -l
+          - app.kubernetes.io/component=api
+          - --timeout=300s
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext: {{ .Values.consumerApi.containerSecurityContext | toYaml  | nindent 10 }}
+        image: {{ .Values.consumerApi.image.customImage | default (printf "htp42/openstudybuilder:consumerapi-%s" .Chart.AppVersion) }}
+        imagePullPolicy: {{ .Values.consumerApi.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.consumerApi.service.port }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.consumerApi.probes.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.consumerApi.probes.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.consumerApi.resources | nindent 12 }}
+        env:
+        {{- range $key, $value := .Values.consumerApi.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        - name: NEO4J_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.neo4j.existingdsnApiSecret | default "neo4j-dsn" }}
+              key: dsn
+        - name: OAUTH_API_APP_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.api.existingClientSecret | default "osb-api-secret" }}
+              key: client-secret
+
+      affinity:
+      {{- with .Values.consumerApi.affinity }}
+        {{- toYaml .Values.consumerApi.affinity | nindent 8 }}
+      {{- end }}
+        {{- if eq .Values.consumerApi.podAntiAffinity "soft" }}
+        podAntiAffinity: {{- include "common.affinities.pods.soft" . | nindent 10}}
+        {{- end }}
+        {{- if eq .Values.consumerApi.podAntiAffinity "hard" }}
+        podAntiAffinity: {{- include "common.affinities.pods.hard" . | nindent 10}}
+        {{- end }}
+      {{- with .Values.consumerApi.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.consumerApi.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

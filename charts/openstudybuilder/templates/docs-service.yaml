@@ -1,0 +1,19 @@
+{{- if .Values.docs.service.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.docs.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "docs"
+spec:
+  type: {{ .Values.docs.service.type }}
+  ports:
+    - port: {{ .Values.docs.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: "docs"
+{{- end }}

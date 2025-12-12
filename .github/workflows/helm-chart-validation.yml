@@ -1,0 +1,80 @@
+name: Helm Chart Validation
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'charts/**'
+      - '.github/workflows/helm-chart-validation.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'charts/**'
+
+jobs:
+  validate-helm-chart:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add neo4j https://neo4j.github.io/helm-charts
+          helm repo update
+
+      - name: Create KinD cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          version: v0.23.0
+          cluster_name: osb-ci
+
+      - name: Verify cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Helm lint
+        run: |
+          helm dependency build charts/openstudybuilder
+          helm lint charts/openstudybuilder --strict
+
+      - name: Helm template (render test)
+        run: |
+          helm template osb charts/openstudybuilder --debug > /dev/null
+
+      - name: Install chart into KinD cluster
+        run: |
+          kubectl create namespace osb || true
+          helm dependency build charts/openstudybuilder
+          helm install osb charts/openstudybuilder -n osb --wait --timeout 15m
+
+      - name: Check pods status
+        run: |
+          kubectl get all -n osb
+          # Wait for core deployments to be ready
+          kubectl rollout status deployment/sb -n osb --timeout=300s
+          kubectl rollout status deployment/api -n osb --timeout=300s
+          kubectl rollout status deployment/consumer-api -n osb --timeout=300s
+          kubectl rollout status deployment/docs -n osb --timeout=300s
+          kubectl rollout status deployment/neodash -n osb --timeout=300s
+          # Demo Neo4j deployment (default demo mode)
+          kubectl rollout status deployment/mdrdb -n osb --timeout=300s || true
+
+      - name: Uninstall release (cleanup)
+        if: always()
+        run: |
+          helm uninstall osb -n osb || true
+          kubectl delete namespace osb || true
