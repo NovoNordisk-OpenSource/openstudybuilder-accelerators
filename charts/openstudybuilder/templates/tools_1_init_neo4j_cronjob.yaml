@@ -1,0 +1,60 @@
+# This job must be executed first time
+# This job can be executed any subsquent times
+# NOTE: we could consider implementing helm hooks https://helm.sh/docs/topics/charts_hooks/
+{{ if .Values.mdrdb.dbTools.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "chart.fullname" . }}-init-neo4j
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.mdrdb.cronjob.schedule.initNeo4j | quote }}
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  # https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#schedule-suspension
+  suspend: true
+  jobTemplate:
+    spec:
+      parallelism: 1
+      completions: 1
+      activeDeadlineSeconds: 36000
+      backoffLimit: 5
+      template:
+        metadata:
+          name: '{{ include "chart.fullname" . }}-init-neo4j'
+        spec:
+          # https://docs.openshift.com/container-platform/4.14/nodes/jobs/nodes-nodes-jobs.html#jobs-limits_nodes-nodes-jobs
+          restartPolicy: OnFailure
+          securityContext: {}
+          containers:
+          - name: init-neo4j
+            image: {{ .Values.mdrdb.dbTools.image.customImage }}
+            command:
+              - /bin/bash
+              - -c
+              - |
+                sleep 10
+                pipenv run init_neo4j
+                echo "Done initializing Neo4j MDR DB..."
+                sleep 10
+            env:
+            {{- range $key, $value := .Values.mdrdb.dbTools.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: NEO4J_MDR_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: password
+            resources:
+              limits:
+                memory: "256Mi"
+                cpu: "500m"
+              requests:
+                memory: "128Mi"
+                cpu: "250m"
+            securityContext: {}
+{{- end }}

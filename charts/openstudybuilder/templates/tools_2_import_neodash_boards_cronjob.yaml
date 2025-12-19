@@ -1,0 +1,73 @@
+# This job must be executed first time
+# This job can be executed any subsquent times
+# NOTE: we could consider implementing helm hooks https://helm.sh/docs/topics/charts_hooks/
+{{ if .Values.mdrdb.dbTools.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "chart.fullname" . }}-import-neodashboards
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.mdrdb.cronjob.schedule.importNeoDashboards | quote }}
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  # https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#schedule-suspension
+  suspend: true
+  jobTemplate:
+    spec:
+      parallelism: 1
+      completions: 1
+      activeDeadlineSeconds: 36000
+      backoffLimit: 5
+      template:
+        metadata:
+          name: '{{ include "chart.fullname" . }}-import-neodashboards'
+        spec:
+          # https://docs.openshift.com/container-platform/4.14/nodes/jobs/nodes-nodes-jobs.html#jobs-limits_nodes-nodes-jobs
+          restartPolicy: OnFailure
+          securityContext: {{ toYaml .Values.mdrdb.dbTools.securityContext | nindent 12 }}
+          containers:
+          - name: import-neodashboards
+            image: {{ .Values.mdrdb.dbTools.image.customImage }}
+            command:
+              - /bin/bash
+              - -c
+              - |
+                sleep 10
+                echo "Importing Neo4j MDR DB NeoDashboards..."
+                mkdir -p {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/neodash_reports/import && FILES="neodash/neodash_reports/*.json" \
+                && for f in $FILES; do echo "Processing $f file..."; filename=`basename $f` content=`cat $f` ; \
+                title=`jq -r .title $f`; uuid=`jq -r .uuid $f`; version=`jq -r .version $f`; echo "$title" "$uuid" "$version"; \
+                jq -n --slurpfile content $f --arg title "$title" --arg uuid "$uuid" --arg version "$version" --arg date "$reportDate" '. += {"content": $content, "title": $title, "uuid": $uuid, "version": $version, "date": $date, "user": "zzMEDBDSCDI4AProductTeam@boehringer-ingelheim.com"}' > {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/neodash_reports/import/$filename; \
+                done \
+                && python -m pipenv run import_reports {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}/neodash_reports/import
+                echo "Done importing Neo4j MDR DB NeoDashboards..."
+                sleep 10
+            volumeMounts:
+              - name: "{{ .Values.mdrdb.stdImports.pvc.name }}-volume"
+                mountPath: {{ .Values.mdrdb.stdImports.env.CDISC_DATA_DIR }}
+            env:
+            {{- range $key, $value := .Values.mdrdb.dbTools.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: NEO4J_MDR_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: password
+            resources:
+              limits:
+                memory: "256Mi"
+                cpu: "500m"
+              requests:
+                memory: "128Mi"
+                cpu: "250m"
+            securityContext: {{ .Values.mdrdb.dbTools.containerSecurityContext | toYaml  | nindent 14 }}
+          volumes:
+          - name: "{{ .Values.mdrdb.stdImports.pvc.name }}-volume"
+            persistentVolumeClaim:
+              claimName: {{ .Values.mdrdb.stdImports.pvc.name }}
+{{- end }}

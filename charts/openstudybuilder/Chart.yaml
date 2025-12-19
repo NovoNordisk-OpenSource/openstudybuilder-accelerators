@@ -1,0 +1,23 @@
+apiVersion: v2
+name: openstudybuilder
+description: A Helm chart for deploying OpenStudyBuilder on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "2.1.1"
+keywords:
+  - openstudybuilder
+  - clinical-trials
+  - study-builder
+home: https://www.openstudybuilder.com/
+sources:
+  - https://github.com/NovoNordisk-OpenSource/openstudybuilder-solution
+  - https://github.com/NovoNordisk-OpenSource/openstudybuilder-accelerators
+maintainers:
+  - name: OpenStudyBuilder Team
+    url: https://github.com/NovoNordisk-OpenSource/openstudybuilder-solution
+
+dependencies:
+  - name: neo4j
+    version: "5.26.x"
+    repository: https://neo4j.github.io/helm-charts
+    condition: neo4j.enabled

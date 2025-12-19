@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.neodash.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "neodash"
+spec:
+  replicas: {{ .Values.neodash.replicaCount }}
+  strategy:
+    {{- toYaml .Values.neodash.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "neodash"
+  template:
+    metadata:
+      {{- with .Values.neodash.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "neodash"
+    spec:
+      {{- with .Values.neodash.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.neodash.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.neodash.securityContext | nindent 12 }}
+        image: {{ .Values.neodash.image.customImage | default (printf "htp42/openstudybuilder:neodash-%s" .Chart.AppVersion) }}
+        imagePullPolicy: {{ .Values.neodash.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.neodash.service.port }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.neodash.probes.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.neodash.probes.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.neodash.resources | nindent 12 }}
+        env:
+        {{- range $key, $value := .Values.neodash.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        - name: standaloneHost
+          value: {{ (index .Values.neo4j.ingress.hosts 0).host | quote }}
+
+      affinity:
+      {{- with .Values.neodash.affinity }}
+        {{- toYaml .Values.neodash.affinity | nindent 8 }}
+      {{- end }}
+        {{- if eq .Values.neodash.podAntiAffinity "soft" }}
+        podAntiAffinity: {{- include "common.affinities.pods.soft" . | nindent 10}}
+        {{- end }}
+        {{- if eq .Values.neodash.podAntiAffinity "hard" }}
+        podAntiAffinity: {{- include "common.affinities.pods.hard" . | nindent 10}}
+        {{- end }}
+      {{- with .Values.neodash.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.neodash.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

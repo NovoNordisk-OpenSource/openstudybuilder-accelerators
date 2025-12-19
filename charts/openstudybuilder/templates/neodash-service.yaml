@@ -1,0 +1,19 @@
+{{- if .Values.neodash.service.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.neodash.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "neodash"
+spec:
+  type: {{ .Values.neodash.service.type }}
+  ports:
+    - port: {{ .Values.neodash.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: "neodash"
+{{- end }}

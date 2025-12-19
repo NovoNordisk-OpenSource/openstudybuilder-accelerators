@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.sb.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "frontend"
+spec:
+  {{- if not .Values.sb.autoscaling.enabled }}
+  replicas: {{ .Values.sb.replicaCount }}
+  {{- end }}
+  strategy:
+    {{- toYaml .Values.sb.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "frontend"
+  template:
+    metadata:
+      {{- with .Values.sb.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "frontend"
+    spec:
+      {{- with .Values.sb.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.sb.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.sb.securityContext | nindent 12 }}
+        image: {{ .Values.sb.image.customImage | default (printf "htp42/openstudybuilder:frontend-%s" .Chart.AppVersion) }}
+        imagePullPolicy: {{ .Values.sb.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.sb.service.port }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.sb.probes.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.sb.probes.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.sb.resources | nindent 12 }}
+        env:
+        {{- range $key, $value := .Values.sb.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+
+      affinity:
+      {{- with .Values.sb.affinity }}
+        {{- toYaml .Values.sb.affinity | nindent 8 }}
+      {{- end }}
+        {{- if eq .Values.sb.podAntiAffinity "soft" }}
+        podAntiAffinity: {{- include "common.affinities.pods.soft" . | nindent 10}}
+        {{- end }}
+        {{- if eq .Values.sb.podAntiAffinity "hard" }}
+        podAntiAffinity: {{- include "common.affinities.pods.hard" . | nindent 10}}
+        {{- end }}
+      {{- with .Values.sb.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.sb.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

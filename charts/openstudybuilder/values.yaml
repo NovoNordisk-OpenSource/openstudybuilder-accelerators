@@ -1,0 +1,909 @@
+## Default values for chart.
+## This is a YAML-formatted file. Intendation matters!
+## Comments are prefixed with two hashes (##), examples are commented with one hash (#)
+## Declare variables to be passed into your templates.
+
+## The number of replicas to deploy.
+## For high availability use more than 1 replica
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  name: "osb"
+
+## STUDYBUILDER - OSB FRONTEND
+sb:
+  fullnameOverride: "sb"
+  replicaCount: 1
+
+  image:
+    customImage: ""
+    pullPolicy: IfNotPresent
+
+  ## Prefer using ingress over openshift routes
+  ingress:
+    enabled: false
+    className: 'openshift-default'  # when enabling ingress, change this to your ingress class, e.g. 'nginx''
+    # router: external
+    annotations:
+      ## adjust openshift timeouts (default is 60s)
+      # haproxy.router.openshift.io/timeout: 300s
+      # haproxy.router.openshift.io/timeout-tunnel: 300s
+      ## e.g. add cert-manager support by annotating the ingress https://cert-manager.io/docs/usage/ingress/
+      ## ask in your company for good defaults
+
+    hosts:
+    - host: openstudybuilder.local
+      paths:
+        - path: /
+          pathType: Prefix
+    tls: [] # If `tls` is left empty then the default OpenShift TLS config will be loaded (i.e.: TLS edge termination with HTTP redirect to HTTPS)
+    # - secretName: chart-example-tls
+    #   hosts:
+    #     - yourapp.yourdomain.com
+
+  service:
+    enabled: true
+    port: 5005
+    type: ClusterIP
+
+  ## There are two types of strategy: `Recreate` and `RollingUpdate`
+  ## Please refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0%
+      maxSurge: 50%
+
+  probes:
+    livenessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: "/"
+        port: 5005
+        scheme: HTTP
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 3
+
+    readinessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: "/"
+        port: 5005
+        scheme: HTTP
+      initialDelaySeconds: 3
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 3
+
+  podAnnotations: {}
+
+  resources:
+    limits:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 100Mi
+    requests:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 100Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  ## PodAntiAffinity is a way to control that not all of your pods are scheduled
+  ## onto the same node.
+  ## possible values: soft, hard, null
+  podAntiAffinity: soft
+
+  env:
+    API_BASE_URL: "/api"
+    DOC_BASE_URL: "/doc/"
+    NEODASH_BASE_URL: "/neodash"
+    OAUTH_ENABLED: "false"
+    OAUTH_RBAC_ENABLED: "false"
+    OAUTH_METADATA_URL: "https://login.microsoftonline.com/*******/v2.0/.well-known/openid-configuration"
+    OAUTH_API_APP_ID: "*******"
+    OAUTH_UI_APP_ID: "******"
+    APPINSIGHTS_DISABLE: "true"
+    API_HOST: "api"
+    API_PORT: "8080"
+    CONSUMER_API_HOST: "consumer-api"
+    CONSUMER_API_PORT: "8080"
+    DOC_HOST: "docs"
+    DOC_PORT: "5006"
+    NEODASH_HOST: "neodash"
+    NEODASH_PORT: "5007"
+
+## API - OSB API
+api:
+  fullnameOverride: "api"
+  replicaCount: 1
+
+  azureTenant: "*******"
+  ## all values related to OAuth2 client secrets, and secrets must contain attribute called 'client-secret' containing the secret value
+  clientSecret: "store-value-via-helm-secrets-or-use-existing-secret"
+  existingClientSecret: ""
+  UiClientSecret: "store-value-via-helm-secrets-or-use-existing-secret"
+  existingUiClientSecret: ""
+
+  image:
+    customImage: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    enabled: true
+    port: 8080
+    type: ClusterIP
+
+  ## There are two types of strategy: `Recreate` and `RollingUpdate`
+  ## Please refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0%
+      maxSurge: 50%
+
+  ## securityContext defines privilege and access control settings for a Pod. Making sure that we don't run as root user.
+  securityContext: {}
+    # runAsNonRoot: true
+    # runAsUser: 1000
+    # runAsGroup: 1000
+    # fsGroup: 1000
+    # fsGroupChangePolicy: "Always"
+
+  ## securityContext defines privilege and access control settings for a Container. Making sure that we don't run as root user.
+  containerSecurityContext: {}
+    # runAsNonRoot: true
+    # runAsUser: 1000
+    # runAsGroup: 1000
+    # capabilities:
+    #   drop: [ "ALL" ]
+
+  ## https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  probes:
+    livenessProbe:
+      failureThreshold: 3
+      tcpSocket:
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 3
+
+    readinessProbe:
+      failureThreshold: 1
+      tcpSocket:
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 3
+
+  podAnnotations: {}
+
+  resources:
+    limits:
+      memory: 768Mi
+      cpu: 500m
+      ephemeral-storage: 1Gi
+    requests:
+      memory: 768Mi
+      cpu: 500m
+      ephemeral-storage: 1Gi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  ## PodAntiAffinity is a way to control that not all of your pods are scheduled
+  ## onto the same node.
+  ## possible values: soft, hard, null
+  podAntiAffinity: soft
+
+  env:
+    UVICORN_PORT: "8080"
+    UVICORN_ROOT_PATH: "/api"
+    UVICORN_APP: "clinical_mdr_api.main:app"
+    HOME: /home/appuser
+    # NEO4J_DSN: defined as a k8s secret and value is found in the secrets.env.yaml, or use existing k8s secret
+    ALLOW_ORIGIN_REGEX: ".*"
+    OAUTH_ENABLED: "False"
+    OAUTH_RBAC_ENABLED: "False"
+    OAUTH_METADATA_URL: "https://login.microsoftonline.com/xxxxxxx/v2.0/.well-known/openid-configuration"
+    ## Client IDs are defined in values.<env>.yaml
+    # OAUTH_API_APP_ID: ""
+    ## Client Secrets are defined in secrets.<env>.yaml and injected as env vars via k8s secrets, or use existing k8s secret
+    # OAUTH_API_APP_SECRET: ""
+    ## To be set when testing is required with Swagger UI or E2E tests
+    # OAUTH_SWAGGER_APP_ID: ""
+    MS_GRAPH_INTEGRATION_ENABLED: "False"
+    MS_GRAPH_GROUPS_QUERY: ""
+    ## Deprecated
+    # OAUTH_APP_ID: ""
+    # OAUTH_APP_SECRET: ""
+    # OAUTH_CLIENT_ID: ""
+    # OIDC_METADATA_DOCUMENT: ""
+
+## CONSUMER API - OSB CONSUMER API
+consumerApi:
+  fullnameOverride: "consumer-api"
+  replicaCount: 1
+
+  image:
+    customImage: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    enabled: true
+    port: 8080
+    type: ClusterIP
+
+  ## There are two types of strategy: `Recreate` and `RollingUpdate`
+  ## Please refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0%
+      maxSurge: 50%
+
+  ## securityContext defines privilege and access control settings for a Pod. Making sure that we don't run as root user.
+  securityContext: {}
+    # runAsNonRoot: true
+    # runAsUser: 1000
+    # runAsGroup: 1000
+    # fsGroup: 1000
+    # fsGroupChangePolicy: "Always"
+
+  ## securityContext defines privilege and access control settings for a Container. Making sure that we don't run as root user.
+  containerSecurityContext: {}
+    # runAsNonRoot: true
+    # runAsUser: 1000
+    # runAsGroup: 1000
+    # capabilities:
+    #   drop: [ "ALL" ]
+
+  probes:
+    livenessProbe:
+      failureThreshold: 3
+      tcpSocket:
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 3
+
+    readinessProbe:
+      failureThreshold: 1
+      tcpSocket:
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 3
+
+  podAnnotations: {}
+
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: 200m
+      ephemeral-storage: 1Gi
+    requests:
+      memory: 512Mi
+      cpu: 200m
+      ephemeral-storage: 1Gi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  ## PodAntiAffinity is a way to control that not all of your pods are scheduled
+  ## onto the same node.
+  ## possible values: soft, hard, null
+  podAntiAffinity: soft
+
+  env:
+    UVICORN_PORT: "8080"
+    UVICORN_ROOT_PATH: "/api"
+    UVICORN_APP: "consumer_api.consumer_api:app"
+    HOME: /home/appuser
+    # NEO4J_DSN: defined as a k8s secret and value is found in the secrets.env.yaml, or use existing k8s secret
+    ALLOW_ORIGIN_REGEX: ".*"
+    OAUTH_ENABLED: "False"
+    OAUTH_RBAC_ENABLED: "False"
+    OAUTH_METADATA_URL: "https://login.microsoftonline.com/********/v2.0/.well-known/openid-configuration"
+    ## Client IDs are defined in values.<env>.yaml
+    # OAUTH_API_APP_ID: ""
+    ## Client Secrets are defined in secrets.<env>.yaml and injected as env vars via k8s secrets, or use existing k8s secret
+    # OAUTH_API_APP_SECRET: ""
+    ## To be set when testing is required with Swagger UI or E2E tests
+    # OAUTH_SWAGGER_APP_ID: ""
+
+## DOCS - OSB DOCUMENTATION
+docs:
+  fullnameOverride: "docs"
+  replicaCount: 1
+
+  image:
+    customImage: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    enabled: true
+    port: 5006
+    type: ClusterIP
+
+  ## There are two types of strategy: `Recreate` and `RollingUpdate`
+  ## Please refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0%
+      maxSurge: 50%
+
+  probes:
+    livenessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: "/"
+        port: 5006
+        scheme: HTTP
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 3
+
+    readinessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: "/"
+        port: 5006
+        scheme: HTTP
+      initialDelaySeconds: 3
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 3
+
+  podAnnotations: {}
+
+  resources:
+    limits:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 100Mi
+    requests:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 100Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  ## PodAntiAffinity is a way to control that not all of your pods are scheduled
+  ## onto the same node.
+  ## possible values: soft, hard, null
+  podAntiAffinity: soft
+
+## NEODASH - NEO4J DASHBOARD
+neodash:
+  fullnameOverride: "neodash"
+  replicaCount: 1
+
+  image:
+    customImage: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    enabled: true
+    port: 5007
+    type: ClusterIP
+
+  ## There are two types of strategy: `Recreate` and `RollingUpdate`
+  ## Please refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0%
+      maxSurge: 50%
+
+  probes:
+    livenessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: "/"
+        port: 5007
+        scheme: HTTP
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 3
+
+    readinessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: "/"
+        port: 5007
+        scheme: HTTP
+      initialDelaySeconds: 3
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 3
+
+  podAnnotations: {}
+
+  resources:
+    limits:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 1Gi
+    requests:
+      memory: 64Mi
+      cpu: 100m
+      ephemeral-storage: 1Gi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  ## PodAntiAffinity is a way to control that not all of your pods are scheduled
+  ## onto the same node.
+  ## possible values: soft, hard, null
+  podAntiAffinity: soft
+
+  env:
+    NGINX_PORT: 5007
+    ## https://neo4j.com/labs/neodash/2.2/developer-guide/configuration/
+    ## https://neo4j.com/docs/operations-manual/current/tutorial/tutorial-sso-configuration/
+    ssoEnabled: "false"
+    standalone: "true"
+    standaloneProtocol: "bolt"
+    ## this is defined via the neo4j.ingress.hosts[0].host value
+    ## standaloneHost: "localhost"
+    ssoDiscoveryUrl: "https://localhost.com"
+    standalonePort: 5002
+    standaloneDatabase: "mdrdb"
+    standaloneAllowLoad: "true"
+    standaloneDashboardName: "Activity Library Dashboard"
+    standaloneDashboardDatabase: "mdrdb"
+    standaloneUsername: "neo4j"
+    ## do not use in production - set via k8s secret instead or use SSO
+    standalonePassword: "changeme1234"
+
+## NEO4J - MDR DB
+neo4j:
+  enabled: false # Set to false when using `neo4j.demo: true` or an external Neo4j instance, and set to true to deploy Neo4j via official Neo4j Helm chart (this subchart)
+  demo: true # Set to true to deploy the Neo4j demo with sample data or false to deploy an external Neo4j instance
+  fullnameOverride: "mdrdb"
+
+  ## https://neo4j.com/docs/operations-manual/current/kubernetes/configuration/#create-yaml
+  neo4j:
+    edition: "community"
+    ## set edition: "enterprise" to use Neo4j Enterprise Edition
+    ##
+    ## To use Neo4j Enterprise Edition you must have a Neo4j license agreement.
+    ##
+    ## More information is also available at: https://neo4j.com/licensing/
+    ## Email inquiries can be directed to: licensing@neo4j.com
+    ##
+    ## Set acceptLicenseAgreement: "yes" to confirm that you have a Neo4j license agreement.
+    acceptLicenseAgreement: "yes"
+    name: "mdrdb"
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+        ephemeral-storage: 1Gi
+      requests:
+        cpu: 2
+        memory: 4Gi
+        ephemeral-storage: 1Gi
+
+    ## how to reset password: https://neo4j.com/docs/operations-manual/current/kubernetes/operations/reset-password/
+    ## NOTE: it is strongly recommended to either provide existing password or set password via values secrets.env.yaml file (see also official Neo4j Helm docs)
+    password: "changeme1234"
+
+    ## set offlineMaintenanceModeEnabled: true to restart the StatefulSet without the Neo4j process running
+    ## this can be used to perform tasks that cannot be performed when Neo4j is running such as `neo4j-admin dump`
+    offlineMaintenanceModeEnabled: false
+
+  dsnApiSecret: "bolt://neo4j:changeme1234@mdrdb:7687/mdrdb"
+  existingdsnApiSecret: ""
+
+  ## https://neo4j.com/docs/operations-manual/current/kubernetes/configuration/#_service_configuration
+  services:
+    neo4j:
+      spec:
+        ## Set type of service to ClusterIP as default is the undesired LoadBalancer
+        type: ClusterIP
+
+  ## The next two sections service and ingress are for connecting via Bolt from Neodash
+  service:
+    boltPort: 7687
+
+  ## Prefer using ingress over openshift routes
+  ingress:
+    enabled: false
+    className: 'openshift-default'
+    # router: external
+    annotations:
+      ## adjust openshift timeouts (default is 60s)
+      # haproxy.router.openshift.io/timeout: 300s
+      # haproxy.router.openshift.io/timeout-tunnel: 300s
+      ## e.g. add cert-manager support by annotating the ingress https://cert-manager.io/docs/usage/ingress/
+      ## ask in your company for good defaults
+
+    hosts:
+    ## value reused for neodash standaloneHost env var
+    - host: "localhost"
+      paths:
+      - path: /
+        pathType: Prefix
+
+    tls: [] # If `tls` is left empty then the default OpenShift TLS config will be loaded (i.e.: TLS edge termination with HTTP redirect to HTTPS)
+    # - secretName: chart-example-tls
+    #   hosts:
+    #     - yourapp.yourdomain.com
+
+  # serviceAccountName: "neo4j"
+
+  ## https://neo4j.com/docs/operations-manual/current/kubernetes/configuration/#_image_customimage
+  image:
+    # https://hub.docker.com/_/neo4j/tags
+    # enterprise redhat ubi9 is "neo4j:5.19.0-enterprise-ubi9"
+    customImage: "htp42/openstudybuilder:database-2.1.1"
+
+  ## Neo4j volumes configuration
+  ## https://neo4j.com/docs/operations-manual/current/kubernetes/persistent-volumes/
+  volumes:
+    data:
+      mode: "defaultStorageClass"
+      defaultStorageClass:
+        requests:
+          storage: 10Gi
+
+  ## Neo4j configuration (yaml format)
+  config:
+    server.memory.heap.initial_size: "2G"
+    server.memory.heap.max_size: "2G"
+    server.memory.pagecache.size: "1G"
+    server.default_listen_address: "0.0.0.0"
+    server.default_advertised_address: "mdrdb"
+    server.bolt.advertised_address: "mdrdb:7687"
+    server.http.advertised_address: "mdrdb:7474"
+    ## Create mdrdb database on startup
+    dbms.default_database: "mdrdb"
+    initial.dbms.default_primaries_count: "1"
+
+  ## securityContext defines privilege and access control settings for a Pod. Making sure that we dont run Neo4j as root user.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 7474
+    runAsGroup: 7474
+    fsGroup: 7474
+    fsGroupChangePolicy: "Always"
+
+  ## securityContext defines privilege and access control settings for a Container. Making sure that we dont run Neo4j as root user.
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 7474
+    runAsGroup: 7474
+    capabilities:
+      drop: [ "ALL" ]
+
+## MDR DB TOOLS (cronjobs/jobs for MDR DB maintenance and imports)
+mdrdb:
+
+  ## Cronjob schedules for MDR DB tools and imports (default is set to not run, requiring manual job creation - set to your desired cron schedule)
+  cronjob:
+    schedule:
+      initNeo4j: "* * * * 1"
+      importNeoDashboards: "* * * * 1"
+      standardsImport: "* * * * 1"
+      studybuilderImport: "* * * * 1"
+      updateCtStats: "* * * * 1"
+
+  ## MDR DB Tools configuration
+  dbTools:
+    enabled: false
+    image:
+      customImage: ""
+    env:
+      HOME: /home/appuser
+      NEO4J_MDR_HOST: "mdrdb.svc.cluster.local"
+      NEO4J_MDR_DATABASE: "mdrdb"
+      NEO4J_MDR_DATABASE_DBNAME: "mdrdb-v2.0.1"
+      NEO4J_MDR_CLEAR_DATABASE: "true"
+      NEO4J_MDR_BACKUP_DATABASE: "true"
+      # NEO4J_MDR_HOST: this is defined in each values.env.yaml
+      NEO4J_MDR_BOLT_PORT: "7687"
+      NEO4J_MDR_AUTH_USER: "neo4j"
+      # NEO4J_MDR_AUTH_PASSWORD: defined as a k8s secret and value is found in the secrets.env.yaml or use existing k8s secret
+
+    ## securityContext defines privilege and access control settings for a Pod. Making sure that we don't run as root user.
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: "Always"
+
+    ## securityContext defines privilege and access control settings for a Container. Making sure that we don't run as root user.
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      # capabilities:
+      #   drop: [ "ALL" ]
+
+  ## MDR STANDARDS IMPORT (cronjob/job for importing CDISC standards into MDR DB)
+  stdImports:
+    enabled: false
+    image:
+      customImage: ""
+    pvc:
+      name: "mdrdb-std-imports"
+      storageClassName: "standard"
+      accessMode: ReadWriteOnce
+      size: "10Gi"
+    existingCdiscSecret: ""
+    cdiscSecret: "changeThisToBeEncyptedViaHelmSecretsOrUseExistingCdiscSecret"
+    env:
+      HOME: /home/appuser
+      NEO4J_MDR_HOST: "mdrdb.svc.cluster.local"
+      NEO4J_CDISC_IMPORT_HOST: "mdrdb.svc.cluster.local"
+      NEO4J_MDR_BOLT_PORT: "7687"
+      # NEO4J_MDR_HOST: this is defined in each values.env.yaml
+      NEO4J_MDR_AUTH_USER: "neo4j"
+      # NEO4J_MDR_AUTH_PASSWORD: defined as a k8s secret and value is found in the secrets.env.yaml
+      NEO4J_MDR_DATABASE: "mdrdb"
+
+      NEO4J_CDISC_IMPORT_BOLT_PORT: "7687"
+      # NEO4J_CDISC_IMPORT_HOST: this is defined in each values.env.yaml
+      NEO4J_CDISC_IMPORT_AUTH_USER: "neo4j"
+      # NEO4J_CDISC_IMPORT_AUTH_PASSWORD: defined as a k8s secret and value is found in the secrets.env.yaml or use existing k8s secret
+      NEO4J_CDISC_IMPORT_DATABASE: "cdisc"
+      CDISC_BASE_URL: "https://library.cdisc.org/api"
+      # CDISC_AUTH_TOKEN: defined as a k8s secret and value is found in the secrets.env.yaml or use existing k8s secret
+
+      ## Download folder for the CDISC JSON package files
+      CDISC_DATA_DIR: "/mdr-standards-import"
+      CDISC_JSON_DIR: "/mdr-standards-import/cdisc_ct"
+      CDISC_XLS_DIR: "CDISC_xls"
+
+    ## securityContext defines privilege and access control settings for a Pod. Making sure that we don't run as root user.
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: "Always"
+
+    ## securityContext defines privilege and access control settings for a Container. Making sure that we don't run as root user.
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      # capabilities:
+      #   drop: [ "ALL" ]
+
+  sbImport:
+    enabled: false
+    image:
+      customImage: ""
+    env:
+      HOME: /home/appuser
+      API_BASE_URL: "http://api:8080"
+      # CLIENT_ID: this is defined in each values.env.yaml
+      # TOKEN_ENDPOINT: this is defined in each values.env.yaml
+      # SCOPE: this is defined in each values.env.yaml
+      # CLIENT_SECRET: defined as a k8s secret via osb-api-ui-secret
+      LOG_LEVEL: "INFO"
+      MDR_MIGRATION_SAMPLE: "False"
+      MDR_MIGRATION_FROM_SAME_ENV: "False"
+      MDR_MIGRATION_EXPORTED_PROGRAMMES: "True"
+      MDR_MIGRATION_EXPORTED_BRANDS: "True"
+      MDR_MIGRATION_EXPORTED_ACTIVITIES: "True"
+      MDR_MIGRATION_EXPORTED_UNITS: "True"
+      MDR_MIGRATION_EXPORTED_COMPOUNDS: "True"
+      MDR_MIGRATION_EXPORTED_TEMPLATES: "True"
+      MDR_MIGRATION_EXPORTED_PROJECTS: "True"
+      MDR_MIGRATION_EXPORTED_STUDIES: "True"
+      MDR_MIGRATION_EXPORTED_CONCEPT_VALUES: "True"
+      INCLUDE_STUDY_NUMBERS: ""
+      EXCLUDE_STUDY_NUMBERS: ""
+      MDR_MIGRATION_INCLUDE_DUMMY_STUDY: "False"
+      MDR_MIGRATION_RENUMBER_DUMMY_STUDY: "False"
+      MDR_MIGRATION_INCLUDE_EXAMPLE_DESIGNS: "False"
+      ## CT libraries
+      MDR_MIGRATION_DICTIONARIES_CODELISTS_DEFINITIONS: "datafiles/libraries/dictionary_codelist_definitions.csv"
+      MDR_MIGRATION_SNOMED: "datafiles/libraries/snomed_xmgm_updated.csv"
+      MDR_MIGRATION_MED_RT: "datafiles/libraries/pclass_exp.csv"
+      MDR_MIGRATION_UNII: "datafiles/libraries/unii_substance_exp.csv"
+      MDR_MIGRATION_UCUM: "datafiles/libraries/common_ucum_units.csv"
+      MDR_MIGRATION_ROLE: "datafiles/sponsor_library/role.csv"
+      MDR_MIGRATION_REGISTID: "datafiles/sponsor_library/registid.csv"
+      MDR_MIGRATION_SPONSOR_DOMAIN: "datafiles/sponsor_library/sponsor_domain.csv"
+      MDR_DATA_SUPPLIER_TYPE: "datafiles/sponsor_library/data_supplier_type.csv"
+      ## Activities
+      MDR_MIGRATION_ACTIVITY_INSTANCES: "datafiles/sponsor_library/activity/activity_instance.csv"
+      MDR_MIGRATION_ACTIVITY_INSTANCE_CLASSES: "datafiles/sponsor_library/activity/activity_instance_class.csv"
+      MDR_MIGRATION_ACTIVITY_ITEM_CLASSES: "datafiles/sponsor_library/activity/activity_item_class.csv"
+      MDR_MIGRATION_FINDING_CATEGORIES: "datafiles/sponsor_library/activity/find_cat_def_exp.csv"
+      MDR_MIGRATION_EVENT_CATEGORIES: "datafiles/sponsor_library/activity/evnt_cat_def_exp.csv"
+      MDR_MIGRATION_INTERVENTION_CATEGORIES: "datafiles/sponsor_library/activity/intrv_cat_def_exp.csv"
+      MDR_MIGRATION_FINDING_SUBCATEGORIES: "datafiles/sponsor_library/activity/find_sub_cat_def_exp.csv"
+      MDR_MIGRATION_EVENT_SUBCATEGORIES: "datafiles/sponsor_library/activity/evnt_sub_cat_def_exp.csv"
+      MDR_MIGRATION_INTERVENTION_SUBCATEGORIES: "datafiles/sponsor_library/activity/intrv_sub_cat_def_exp.csv"
+      ## Epoch
+      MDR_MIGRATION_SPONSOR_EPOCH: "datafiles/sponsor_library/epoch/sponsor_def_epochs.csv"
+      MDR_MIGRATION_EPOCH: "datafiles/sponsor_library/epoch/epoch_exp.csv"
+      MDR_MIGRATION_EPOCH_ORDER: "datafiles/sponsor_library/epoch/epoch_order.csv"
+      MDR_MIGRATION_EPOCH_SUB_TYPE: "datafiles/sponsor_library/epoch/epoch_subtype_exp.csv"
+      MDR_MIGRATION_EPOCH_TYPE: "datafiles/sponsor_library/epoch/epoch_type_exp.csv"
+      ## Various
+      FEATURE_FLAGS: "datafiles/configuration/feature_flags.csv"
+      MDR_MIGRATION_CODELIST_PARAMETER_SET: "datafiles/codelist_parameter_set.csv"
+      MDR_STUDY_FIELDS_DEFINITIONS: "datafiles/configuration/study_fields_configuration.csv"
+      ## Compounds
+      MDR_MIGRATION_COMPOUNDS: "datafiles/compounds/compounds.json"
+      MDR_MIGRATION_ACTIVE_SUBSTANCES: "datafiles/compounds/active_substances.json"
+      MDR_MIGRATION_PHARMACEUTICAL_PRODUCTS: "datafiles/compounds/pharmaceutical_products.json"
+      MDR_MIGRATION_MEDICINAL_PRODUCTS: "datafiles/compounds/medicinal_products.json"
+      ## Visit
+      MDR_MIGRATION_VISIT_CONTACT_MODE: "datafiles/sponsor_library/visit/visit_contact_mode.csv"
+      MDR_MIGRATION_VISIT_SUB_LABEL: "datafiles/sponsor_library/visit/visit_sub_label.csv"
+      MDR_MIGRATION_VISIT_TYPE: "datafiles/sponsor_library/visit/visit_type_exp.csv"
+      MDR_MIGRATION_EPOCH_ALLOCATION: "datafiles/sponsor_library/visit/epoch_allocation_rule.csv"
+      ## Units
+      MDR_MIGRATION_UNIT_DIF: "datafiles/sponsor_library/units/unit_def_v2.csv"
+      MDR_MIGRATION_UNIT_DIMENSION: "datafiles/sponsor_library/units/unit_dimension.csv"
+      MDR_MIGRATION_UNIT_SUBSETS: "datafiles/sponsor_library/units/unit_subset.csv"
+      MDR_MIGRATION_SPONSOR_UNITS: "datafiles/sponsor_library/units/sponsor_units.csv"
+      ## Frequency
+      MDR_MIGRATION_FREQUENCY: "datafiles/sponsor_library/frequency.csv"
+      ## Trial type
+      MDR_MIGRATION_TRIAL_TYPE: "datafiles/sponsor_library/trial_type.csv"
+      ## Criteria
+      MDR_MIGRATION_CRITERIA_TYPE: "datafiles/sponsor_library/criteria/criteria_type.csv"
+      MDR_MIGRATION_CRITERIA_CATEGORY: "datafiles/sponsor_library/criteria/criteria_category.csv"
+      MDR_MIGRATION_CRITERIA_SUB_CATEGORY: "datafiles/sponsor_library/criteria/criteria_sub_category.csv"
+      ## Footnote
+      MDR_MIGRATION_FOOTNOTE_TYPE: "datafiles/sponsor_library/footnote/footnote_type.csv"
+      ## Endpoint
+      MDR_MIGRATION_OBJECTIVE_CATEGORY: "datafiles/sponsor_library/objective_category.csv"
+      MDR_MIGRATION_ENDPOINT_LEVEL: "datafiles/sponsor_library/endpoint/endpoint_level.csv"
+      MDR_MIGRATION_ENDPOINT_CATEGORY: "datafiles/sponsor_library/endpoint/endpoint_category.csv"
+      MDR_MIGRATION_ENDPOINT_SUB_CATEGORY: "datafiles/sponsor_library/endpoint/endpoint_sub_category.csv"
+      MDR_MIGRATION_ENDPOINT_SUB_LEVEL: "datafiles/sponsor_library/endpoint/endpoint_sub_level.csv"
+      ## Element
+      MDR_MIGRATION_ELEMENT_TYPE: "datafiles/sponsor_library/element/element_type_exp.csv"
+      MDR_MIGRATION_ELEMENT_SUBTYPE: "datafiles/sponsor_library/element/element_subtype_exp.csv"
+      ## CRFs
+      MDR_MIGRATION_ODM_VENDOR_NAMESPACES: "datafiles/libraries/concepts/crfs/odm_vendor_namespaces.csv"
+      MDR_MIGRATION_ODM_VENDOR_ATTRIBUTES: "datafiles/libraries/concepts/crfs/odm_vendor_attributes.csv"
+      MDR_MIGRATION_ODM_TEMPLATES: "datafiles/libraries/concepts/crfs/odm_templates.csv"
+      MDR_MIGRATION_ODM_FORMS: "datafiles/libraries/concepts/crfs/odm_forms.csv"
+      MDR_MIGRATION_ODM_ITEMGROUPS: "datafiles/libraries/concepts/crfs/odm_itemgroups.csv"
+      MDR_MIGRATION_ODM_ITEMS: "datafiles/libraries/concepts/crfs/odm_items.csv"
+      MDR_MIGRATION_ODM_ALIAS: "datafiles/libraries/concepts/crfs/odm_alias.csv"
+      MDR_MIGRATION_ODM_TEMPLATE_TO_FORM_RELATIONSHIP: "datafiles/libraries/concepts/crfs/odm_templates_to_forms.csv"
+      MDR_MIGRATION_ODM_FORM_TO_ITEMGROUP_RELATIONSHIP: "datafiles/libraries/concepts/crfs/odm_forms_to_itemgroups.csv"
+      MDR_MIGRATION_ODM_ITEMGROUP_TO_ITEM_RELATIONSHIP: "datafiles/libraries/concepts/crfs/odm_itemgroups_to_items.csv"
+      ## Unsorted for sponsor library
+      MDR_MIGRATION_SPONSOR_CODELIST_DEFINITIONS: "datafiles/sponsor_library/sponsor_codelist_definitions.csv"
+      MDR_MIGRATION_THERAPY_AREA: "datafiles/sponsor_library/ta_exp.csv"
+      MDR_MIGRATION_NULL_FLAVOR: "datafiles/sponsor_library/null_flavor_exp.csv"
+      MDR_MIGRATION_OBJECTIVE_LEVEL: "datafiles/sponsor_library/objective_level.csv"
+      MDR_MIGRATION_DOSAGE_FORM: "datafiles/sponsor_library/dosage_form_exp.csv"
+      MDR_MIGRATION_TIME_REFERENCE: "datafiles/sponsor_library/time_reference_exp.csv"
+      MDR_MIGRATION_TYPE_OF_TREATMENT: "datafiles/sponsor_library/type_of_treatment_exp.csv"
+      MDR_MIGRATION_OPERATOR: "datafiles/sponsor_library/operator.csv"
+      MDR_MIGRATION_FLOWCHART_GROUP: "datafiles/sponsor_library/flowchart_grp.csv"
+      MDR_MIGRATION_ARM_TYPE: "datafiles/sponsor_library/arm_type.csv"
+      MDR_MIGRATION_COMPOUND_DISPENSED_IN: "datafiles/sponsor_library/compound_dispensed_in.csv"
+      MDR_MIGRATION_DEVICE: "datafiles/sponsor_library/delivery_device.csv"
+      MDR_MIGRATION_LANGUAGE: "datafiles/sponsor_library/language.csv"
+      MDR_MIGRATION_DATATYPE: "datafiles/sponsor_library/datatype.csv"
+      MDR_MIGRATION_DATA_COLLECTION_MODE: "datafiles/sponsor_library/data_collection_mode.csv"
+      MDR_MIGRATION_CONFIRMATORY_PURPOSE: "datafiles/sponsor_library/confirmatory_purpose.csv"
+      MDR_MIGRATION_NONCONFIRMATORY_PURPOSE: "datafiles/sponsor_library/nonconfirmatory_purpose.csv"
+      MDR_MIGRATION_TRIAL_BLINDING_SCHEMA: "datafiles/sponsor_library/trial_blinding_schema.csv"
+      MDR_MIGRATION_DISEASE_MILESTONE: "datafiles/sponsor_library/disease_milestone.csv"
+      MDR_MIGRATION_REPEATING_VISIT_FREQUENCY: "datafiles/sponsor_library/repeating_visit_frequency.csv"
+      MDR_MIGRATION_CATEGORY_FOR_CLINICAL_EVENTS: "datafiles/sponsor_library/activity/terms/category_for_clinical_events.csv"
+      MDR_MIGRATION_CATEGORY_FOR_HEALTHCARE_ENCOUNTERS: "datafiles/sponsor_library/activity/terms/category_for_healthcare_encounters.csv"
+      MDR_MIGRATION_CATEGORY_FOR_MEDICAL_HISTORY: "datafiles/sponsor_library/activity/terms/category_for_medical_history.csv"
+      MDR_MIGRATION_CATEGORY_FOR_VITAL_SIGNS: "datafiles/sponsor_library/activity/terms/category_for_vital_signs.csv"
+      MDR_MIGRATION_SUBCATEGORY_FOR_MEDICAL_HISTORY: "datafiles/sponsor_library/activity/terms/subcategory_for_medical_history.csv"
+      MDR_MIGRATION_EVENT_ADJUDICATION_TEST_NAME: "datafiles/sponsor_library/activity/terms/event_adjudication_test_name.csv"
+      MDR_MIGRATION_EVENT_ADJUDICATION_TEST_CODE: "datafiles/sponsor_library/activity/terms/event_adjudication_test_code.csv"
+      MDR_MIGRATION_PHARMACOKINETIC_TEST_NAME: "datafiles/sponsor_library/activity/terms/pharmacokinetic_test_name.csv"
+      MDR_MIGRATION_PHARMACOKINETIC_TEST_CODE: "datafiles/sponsor_library/activity/terms/pharmacokinetic_test_code.csv"
+      MDR_MIGRATION_CATEGORY_FOR_REPRODUCTIVE_SYSTEM_FINDING: "datafiles/sponsor_library/activity/terms/category_for_reproductive_system_finding.csv"
+      MDR_MIGRATION_CATEGORY_FOR_ECG_TEST_RESULTS: "datafiles/sponsor_library/activity/terms/category_for_ecg_test_results.csv"
+      MDR_MIGRATION_CATEGORY_FOR_OPHTHALMIC_TEST_OR_EXAM: "datafiles/sponsor_library/activity/terms/category_for_ophthalmic_test_or_exam.csv"
+      MDR_MIGRATION_RESPONSE_LIST_FOR_HEPATIC_EVENT_TOPIC_CODES: "datafiles/sponsor_library/activity/terms/response_list_for_hepatic_event_topic_codes.csv"
+      MDR_MIGRATION_NAME_OF_TREATMENT_EC: "datafiles/sponsor_library/activity/terms/name_of_treatment_ec.csv"
+      MDR_MIGRATION_CATEGORY_FOR_PROCEDURE_AGENTS: "datafiles/sponsor_library/activity/terms/category_for_procedure_agents.csv"
+      MDR_MIGRATION_CATEGORY_FOR_CONCOMITANT_MEDICATIONS: "datafiles/sponsor_library/activity/terms/category_for_concomitant_medications.csv"
+      MDR_MIGRATION_CATEGORY_FOR_EXPOSURE_AS_COLLECTED: "datafiles/sponsor_library/activity/terms/category_for_exposure_as_collected.csv"
+      MDR_MIGRATION_CATEGORY_FOR_EXPOSURE: "datafiles/sponsor_library/activity/terms/category_for_exposure.csv"
+      MDR_MIGRATION_CATEGORY_FOR_SUBSTANCE_USE: "datafiles/sponsor_library/activity/terms/category_for_substance_use.csv"
+      ## Mock data
+      MDR_MIGRATION_PROJECTS: "datafiles/mockup/project_exp.csv"
+      MDR_MOCKUP_OBJECTIVES: "datafiles/mockup/objectives.csv"
+      MDR_MOCKUP_OBJECTIVES_OBJECTS: "datafiles/mockup/objectives_objects.csv"
+      MDR_MOCKUP_ENDPOINTS_OBJECTS: "datafiles/mockup/endpoints_objects.csv"
+      MDR_MOCKUP_TIMEFRAMES_OBJECTS: "datafiles/mockup/timeframes_objects.csv"
+      MDR_MOCKUP_STUDY_OBJECTIVES: "datafiles/mockup/study_objectives.csv"
+      MDR_MOCKUP_STUDY_ENDPOINTS: "datafiles/mockup/study_endpoints.csv"
+      MDR_MIGRATION_STUDY: "datafiles/mockup/study_exp.csv"
+      MDR_MIGRATION_STUDY_TYPE: "datafiles/mockup/migrated_ts_definitions_exp.csv"
+      ## Sponsor Models
+      MDR_MIGRATION_ACTIVITY_INSTANCE_CLASS_MODEL_RELS: "datafiles/sponsor_library/sponsormodel/dataset_class_activity_instance_class_full.csv"
+      MDR_MIGRATION_ACTIVITY_ITEM_CLASS_MODEL_RELS: "datafiles/sponsor_library/sponsormodel/variable_class_activity_item_class_full.csv"
+      MDR_MIGRATION_SPONSOR_MODEL_DIRECTORY: "datafiles/sponsor_library/sponsormodel"
+      MDR_MIGRATION_SPONSOR_MODEL_DATASETS: "ReferenceTables.csv"
+      MDR_MIGRATION_SPONSOR_MODEL_DATASET_VARIABLES: "ReferenceColumns.csv"
+      MDR_MIGRATION_SPONSOR_MODEL_WRITE_LOGFILE: "" # intentionally empty to avoid creating a logfile in the container working directory; set to "True" to enable or provide an absolute writable path (e.g. /tmp/sponsor_model_import.txt)
+      ## Projects exported by studybuilder-export script
+      IMPORT_PROJECTS: "datafiles/mockup/exported/projects.json"
+      ## Additional data needed for E2E testing
+      MDR_MIGRATION_STUDY_VERSIONS: "False"
+      MDR_MIGRATION_VERSIONED_STUDY_PATH: ""
+      ## Study Milestone Codelists
+      MDR_MIGRATION_LOCK_STUDY_MILESTONE: "datafiles/sponsor_library/lock_study_milestone.csv"
+      MDR_MIGRATION_UNLOCK_STUDY_MILESTONE: "datafiles/sponsor_library/unlock_study_milestone.csv"
+      ## Complexity Score
+      MDR_COMPLEXITY_BURDENS: "datafiles/complexity_score/burdens.csv"
+      MDR_COMPLEXITY_ACTIVITY_BURDENS_MAPPING: "datafiles/complexity_score/activity_burdens.csv"
+
+    ## securityContext defines privilege and access control settings for a Pod. Making sure that we don't run as root user.
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: "Always"
+
+    ## securityContext defines privilege and access control settings for a Container. Making sure that we don't run as root user.
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      # capabilities:
+      #   drop: [ "ALL" ]

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.docs.fullnameOverride }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "docs"
+spec:
+  replicas: {{ .Values.docs.replicaCount }}
+  strategy:
+    {{- toYaml .Values.docs.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: "docs"
+  template:
+    metadata:
+      {{- with .Values.docs.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: "docs"
+    spec:
+      {{- with .Values.docs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.docs.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.docs.securityContext | nindent 12 }}
+        image: {{ .Values.docs.image.customImage | default (printf "htp42/openstudybuilder:documentation-%s" .Chart.AppVersion) }}
+        imagePullPolicy: {{ .Values.docs.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.docs.service.port }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.docs.probes.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.docs.probes.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.docs.resources | nindent 12 }}
+
+      affinity:
+      {{- with .Values.docs.affinity }}
+        {{- toYaml .Values.docs.affinity | nindent 8 }}
+      {{- end }}
+        {{- if eq .Values.docs.podAntiAffinity "soft" }}
+        podAntiAffinity: {{- include "common.affinities.pods.soft" . | nindent 10}}
+        {{- end }}
+        {{- if eq .Values.docs.podAntiAffinity "hard" }}
+        podAntiAffinity: {{- include "common.affinities.pods.hard" . | nindent 10}}
+        {{- end }}
+      {{- with .Values.docs.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.docs.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

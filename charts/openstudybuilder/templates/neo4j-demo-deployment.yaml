@@ -1,0 +1,66 @@
+{{- /* Early guard: fail before subcharts/templates render when both neo4j subchart and demo are enabled */ -}}
+{{- $subchart := default false .Values.neo4j.enabled -}}
+{{- $demoAlias := default false .Values.neo4j.demo -}}
+{{- if and $subchart $demoAlias -}}
+{{- fail "Invalid configuration: both 'neo4j.enabled' and 'neo4j.demo' mode are enabled. Disable the subchart ('neo4j.enabled: false') when using demo ('neo4j.demo: true')." -}}
+{{- end -}}
+{{- if .Values.neo4j.demo }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.neo4j.neo4j.name }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.neo4j.neo4j.name }}
+    helm.neo4j.com/instance: mdrdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: {{ .Values.neo4j.neo4j.name }}
+      helm.neo4j.com/instance: mdrdb
+  template:
+    metadata:
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: {{ .Values.neo4j.neo4j.name }}
+        helm.neo4j.com/instance: mdrdb
+    spec:
+      containers:
+        - name: {{ .Values.neo4j.neo4j.name }}-0
+          image: {{ .Values.neo4j.image.customImage }}
+          imagePullPolicy: "IfNotPresent"
+          env:
+            - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
+              value: "yes"
+            - name: NEO4J_server_memory_heap_initial__size
+              value: "2G"
+            - name: NEO4J_server_memory_heap_max__size
+              value: "2G"
+            - name: NEO4J_server_memory_pagecache_size
+              value: "1G"
+            - name: NEO4J_server_default__listen__address
+              value: "0.0.0.0"
+            - name: NEO4J_server_default__advertised__address
+              value: "{{ .Values.neo4j.neo4j.name }}"
+            - name: NEO4J_server_bolt_advertised__address
+              value: "{{ .Values.neo4j.neo4j.name }}:5002"
+            - name: NEO4J_server_http_advertised__address
+              value: "{{ .Values.neo4j.neo4j.name }}:5001"
+          ports:
+            - name: http
+              containerPort: 7474
+            - name: bolt
+              containerPort: 7687
+          readinessProbe:
+            tcpSocket:
+              port: 7687
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 7687
+            initialDelaySeconds: 10
+            periodSeconds: 10
+{{- end }}

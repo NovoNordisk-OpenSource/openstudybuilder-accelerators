@@ -1,0 +1,5 @@
+# Helm chart lock file
+**/Chart.lock
+
+# Packaged charts
+*.tgz

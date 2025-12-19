@@ -1,0 +1,19 @@
+{{ if .Values.mdrdb.stdImports.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.mdrdb.stdImports.pvc.name }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  finalizers:
+    - kubernetes.io/pvc-protection
+  annotations:
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    - {{ .Values.mdrdb.stdImports.pvc.accessMode }}
+  storageClassName: {{ .Values.mdrdb.stdImports.pvc.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.mdrdb.stdImports.pvc.size }}
+{{ end }}
