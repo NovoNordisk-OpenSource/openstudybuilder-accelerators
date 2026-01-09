@@ -333,7 +333,7 @@ consumerApi:
 
   env:
     UVICORN_PORT: "8080"
-    UVICORN_ROOT_PATH: "/api"
+    UVICORN_ROOT_PATH: "/consumer-api"
     UVICORN_APP: "consumer_api.consumer_api:app"
     HOME: /home/appuser
     # NEO4J_DSN: defined as a k8s secret and value is found in the secrets.env.yaml, or use existing k8s secret
