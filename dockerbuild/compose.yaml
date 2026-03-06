@@ -60,6 +60,24 @@ services:
      UVICORN_ROOT_PATH: "/consumer-api"
      UVICORN_APP: consumer_api.consumer_api:app
 
+ # Extensions API image & service
+ extensionsapi:
+   image: ${API_IMAGE:-htp42/openstudybuilder:extensionsapi-latest}
+   depends_on:
+     database:
+       condition: service_healthy
+   environment:
+     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:changeme1234@database:7687/mdrdb}"
+     ALLOW_ORIGIN_REGEX: "${ALLOW_ORIGIN_REGEX:-.*}"
+     OAUTH_ENABLED: "${OAUTH_ENABLED:-False}"
+     OAUTH_RBAC_ENABLED: "${OAUTH_RBAC_ENABLED:-False}"
+     OAUTH_METADATA_URL: "${OAUTH_METADATA_URL:-}"
+     OAUTH_API_APP_ID: "${OAUTH_API_APP_ID:-}"
+     OAUTH_SWAGGER_APP_ID: "${OAUTH_SWAGGER_APP_ID:-}"
+     UVICORN_PORT: 5009
+     UVICORN_ROOT_PATH: "/extensions-api"
+     UVICORN_APP: extensions.extensions_api:app
+
   # Frontend image
  frontend:
    image: ${FRONTEND_IMAGE:-htp42/openstudybuilder:frontend-latest}
