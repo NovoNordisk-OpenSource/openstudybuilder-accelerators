@@ -1,10 +1,18 @@
 # Docker Compose file building OSB solution from public images
 
+# Docker command for Windows:
+#docker compose --env-file .env.example up
+
+# Docker commands for Linux/Mac:
+#NEO4J_MDR_AUTH_PASSWORD=put_your_password_here docker compose up
+
 services:
 
   # Database image & service
  database:
-   image: ${NEO4J_IMAGE:-htp42/openstudybuilder:database-latest} 
+   image: ${NEO4J_IMAGE:-htp42/openstudybuilder:database-latest}
+   secrets:
+    - neo4j_mdr_auth_password
    environment:
      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
      NEO4J_server_memory_heap_initial__size: "2G"
@@ -14,11 +22,12 @@ services:
      NEO4J_server_default__advertised__address: "localhost"
      NEO4J_server_bolt_advertised__address: "localhost:5002"
      NEO4J_server_http_advertised__address: "localhost:5001"
+     NEO4J_AUTH: "neo4j/${NEO4J_MDR_AUTH_PASSWORD:?Set NEO4J_MDR_AUTH_PASSWORD in .env or environment}"
    ports:
      - "${BIND_ADDRESS:-127.0.0.1}:${NEO4J_BOLT_PORT:-5002}:7687"
      - "${BIND_ADDRESS:-127.0.0.1}:${NEO4J_HTTP_PORT:-5001}:7474"
    volumes:
-     - type: volume 
+     - type: volume
        source: data
        target: /data
 
@@ -29,7 +38,7 @@ services:
      database:
        condition: service_healthy
    environment:
-     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:changeme1234@database:7687/mdrdb}"
+     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:${NEO4J_MDR_AUTH_PASSWORD:?Set NEO4J_MDR_AUTH_PASSWORD in .env or environment}@database:7687/mdrdb}"
      ALLOW_ORIGIN_REGEX: "${ALLOW_ORIGIN_REGEX:-.*}"
      OAUTH_ENABLED: "${OAUTH_ENABLED:-False}"
      OAUTH_RBAC_ENABLED: "${OAUTH_RBAC_ENABLED:-False}"
@@ -41,6 +50,11 @@ services:
      MS_GRAPH_GROUPS_QUERY: "${MS_GRAPH_GROUPS_QUERY:-}"
      UVICORN_PORT: 5003
      UVICORN_ROOT_PATH: "/api"
+     # deprecated #
+     OAUTH_APP_ID: "${OAUTH_APP_ID:-}"
+     OAUTH_APP_SECRET: "${OAUTH_APP_SECRET:-}"
+     OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID:-}"
+     OIDC_METADATA_DOCUMENT: "${OIDC_METADATA_DOCUMENT:-}"
 
   # Consumer API image & service
  consumerapi:
@@ -49,7 +63,7 @@ services:
      database:
        condition: service_healthy
    environment:
-     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:changeme1234@database:7687/mdrdb}"
+     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:${NEO4J_MDR_AUTH_PASSWORD:?Set NEO4J_MDR_AUTH_PASSWORD in .env or environment}@database:7687/mdrdb}"
      ALLOW_ORIGIN_REGEX: "${ALLOW_ORIGIN_REGEX:-.*}"
      OAUTH_ENABLED: "${OAUTH_ENABLED:-False}"
      OAUTH_RBAC_ENABLED: "${OAUTH_RBAC_ENABLED:-False}"
@@ -67,7 +81,7 @@ services:
      database:
        condition: service_healthy
    environment:
-     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:changeme1234@database:7687/mdrdb}"
+     NEO4J_DSN: "${NEO4J_DSN:-bolt://neo4j:${NEO4J_MDR_AUTH_PASSWORD:?Set NEO4J_MDR_AUTH_PASSWORD in .env or environment}@database:7687/mdrdb}"
      ALLOW_ORIGIN_REGEX: "${ALLOW_ORIGIN_REGEX:-.*}"
      OAUTH_ENABLED: "${OAUTH_ENABLED:-False}"
      OAUTH_RBAC_ENABLED: "${OAUTH_RBAC_ENABLED:-False}"
@@ -77,6 +91,7 @@ services:
      UVICORN_PORT: 5009
      UVICORN_ROOT_PATH: "/extensions-api"
      UVICORN_APP: extensions.extensions_api:app
+     API_BASE_URL: "${API_BASE_URL:-http://api:5003/api}"
 
   # Frontend image
  frontend:
@@ -89,8 +104,10 @@ services:
        condition: service_healthy
      neodash:
        condition: service_healthy
-   ports:
-     - "${BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-5005}:5005"
+     consumerapi:
+       condition: service_healthy
+     extensionsapi:
+       condition: service_healthy
    environment:
      API_BASE_URL: "${API_PATH:-}"
      DOC_BASE_URL: "${DOC_PATH:-}"
@@ -111,8 +128,6 @@ services:
    depends_on:
      database:
        condition: service_healthy
-   ports:
-     - "${BIND_ADDRESS:-127.0.0.1}:${NEODASH_PORT:-5007}:5007"
    environment:
      - NGINX_PORT=5007
      - ssoEnabled=false
@@ -126,9 +141,34 @@ services:
      - standaloneDashboardName=Activity Library Dashboard
      - standaloneDashboardDatabase=mdrdb
      - standaloneUsername=neo4j
-     - standalonePassword=${NEO4J_PASSWORD:-changeme1234}
+     - standalonePassword=${NEO4J_MDR_AUTH_PASSWORD:?Set NEO4J_MDR_AUTH_PASSWORD in .env or environment}
+
+  # Gateway reverse proxy for accessing the compose services through one local entry point
+ gateway:
+   image: ${GATEWAY_IMAGE:-htp42/openstudybuilder:gateway-latest}
+   depends_on:
+     frontend:
+       condition: service_healthy
+     api:
+       condition: service_healthy
+     documentation:
+       condition: service_healthy
+     neodash:
+       condition: service_healthy
+     consumerapi:
+       condition: service_healthy
+     extensionsapi:
+       condition: service_healthy
+   ports:
+     - "${BIND_ADDRESS:-127.0.0.1}:${GATEWAY_PORT:-8080}:80"
+
+secrets:
+  # Docker secret sourced from the host environment variable (loaded from .env by compose).
+  # Mounted into containers at /run/secrets/neo4j_mdr_auth_password.
+  neo4j_mdr_auth_password:
+    environment: NEO4J_MDR_AUTH_PASSWORD
 
 volumes:
   # Volume for storing the database on a local development environment
  data:
-   name: studybuilder_database
+   name: openstudybuilder_database
